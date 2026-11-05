@@ -1,0 +1,21 @@
+[project]
+name = "thai-speech-notebooks"
+version = "0.1.0"
+requires-python = ">=3.11"
+# VAD libraries pinned to the versions the manual was tested with.
+# onnxruntime: silero-vad 6.x imports it at package import but only declares it as an optional extra.
+dependencies = [
+    "silero-vad==6.2.2",
+    "onnxruntime",
+    "ten-vad==1.0.6.9",
+    "webrtcvad-wheels==2.0.14.post1",
+    "torch",
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "jupyterlab",
+    "ipykernel",
+]
+
+[tool.uv]
+package = false

@@ -15,8 +15,18 @@ Hands-on companions to the team's speech manual: one notebook per section, each 
 
 ## Run
 
-- **Colab:** open the notebook from GitHub. Set `REPO_RAW` in its second code cell to this repository's raw URL, or upload `data/` with Colab's Files panel.
-- **Locally:** from a clone, `uv venv && source .venv/bin/activate && uv pip install jupyterlab torch numpy pandas matplotlib`, then `jupyter lab`. Each notebook installs its own libraries in its first cell.
+**Locally** (needs [uv](https://docs.astral.sh/uv)):
+
+```bash
+git clone <this repository's URL>
+cd thai-speech-notebooks
+uv sync            # installs the pinned libraries from uv.lock into .venv
+uv run jupyter lab
+```
+
+On Linux, TEN VAD also needs the system library `libc++1` (`sudo apt install libc++1`), as its package notes say.
+
+**Colab:** open the notebook from GitHub; its setup cell installs what Colab lacks. Then upload `data/` with Colab's Files panel. While this repository is private, Colab cannot download from it; once it is public, set `REPO_RAW` in the notebook's second code cell to its raw URL instead.
 
 ## Data
 
