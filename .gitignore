@@ -2,3 +2,5 @@
 .ipynb_checkpoints/
 .venv/
 segments/
+segments.csv
+segments.txt
