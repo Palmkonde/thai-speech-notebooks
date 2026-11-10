@@ -15,6 +15,7 @@ dependencies = [
     "matplotlib",
     "jupyterlab",
     "ipykernel",
+    "pyannote-metrics==4.1",
 ]
 
 [tool.uv]
