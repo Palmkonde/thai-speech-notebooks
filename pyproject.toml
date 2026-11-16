@@ -16,6 +16,8 @@ dependencies = [
     "jupyterlab",
     "ipykernel",
     "pyannote-metrics==4.1",
+    "pyannote-audio==4.0.0",
+    "torchcodec==0.9.1",
 ]
 
 [tool.uv]

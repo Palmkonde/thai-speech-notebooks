@@ -4,3 +4,5 @@
 segments/
 segments.csv
 segments.txt
+overlap.py
+*.community-1.rttm
