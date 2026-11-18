@@ -4,6 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.11"
 # VAD libraries pinned to the versions the manual was tested with.
 # onnxruntime: silero-vad 6.x imports it at package import but only declares it as an optional extra.
+# huggingface-hub: downloads FireRedVAD's weights, which its package does not include.
 dependencies = [
     "silero-vad==6.2.2",
     "onnxruntime",
@@ -18,6 +19,8 @@ dependencies = [
     "pyannote-metrics==4.1",
     "pyannote-audio==4.0.0",
     "torchcodec==0.9.1",
+    "fireredvad==0.0.2",
+    "huggingface-hub>=2.4.0",
 ]
 
 [tool.uv]
