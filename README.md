@@ -5,8 +5,9 @@ Hands-on companions to the team's speech manual: one notebook per section, each 
 | Notebook | Section | Status |
 |---|---|---|
 | [vad.ipynb](vad.ipynb) | Voice activity detection | draft |
-| `stt.ipynb` | Speech-to-text | not started |
+| [ASR_transcription.ipynb](ASR_transcription.ipynb) | Speech-to-text | draft |
 | [diarization.ipynb](diarization.ipynb) | Speaker diarization | draft |
+| [pipeline.ipynb](pipeline.ipynb) | All three on one recording: Part 1 VAD, Part 2 ASR, Part 3 diarization, then who said what | draft |
 
 ## Rules
 
@@ -27,6 +28,22 @@ uv run jupyter lab
 On Linux, TEN VAD also needs the system library `libc++1` (`sudo apt install libc++1`), as its package notes say.
 
 **Colab:** open the notebook from GitHub; its setup cell installs what Colab lacks. Then upload `data/` with Colab's Files panel. While this repository is private, Colab cannot download from it; once it is public, set `REPO_RAW` in the notebook's second code cell to its raw URL instead.
+
+## Who said what (local page)
+
+`app/` joins the three steps: upload the full recording, ASR's `results.jsonl` and VAD's `segments.csv`, press **Diarize**, and each segment gets a speaker from Community-1, run once on the whole recording. Rename speakers, click a row to play it, and download the result as CSV or RTTM.
+
+Two parts, on the same machine:
+
+```bash
+uv sync                       # once
+uv run python app/server.py   # the diarization server, native: reads HF_TOKEN from .env, port 8001
+docker compose up --build     # the website, port 8000: open http://127.0.0.1:8000
+```
+
+The website container only serves the page; its **Diarize** button forwards the audio to the native server, so pyannote runs at full speed and the token never enters Docker. If the native server is not running, the page says so. `uv run python app/server.py` alone also works: open http://127.0.0.1:8001.
+
+The browser reads the transcripts and times itself; only the audio goes to the local server. A segment flagged "under 80% one speaker" may span a speaker change: listen to it. The audio must be 16-bit WAV. `data/clean/` has all three inputs.
 
 ## Data
 

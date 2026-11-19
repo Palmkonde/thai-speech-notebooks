@@ -1,0 +1,11 @@
+# The website. Diarization runs natively: start `uv run python app/server.py` too (port 8001).
+#   docker compose up --build   then open http://127.0.0.1:8000
+services:
+  app:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"   # this machine only
+    environment:
+      DIARIZE_URL: http://host.docker.internal:8001   # the native diarization server on this machine
+    extra_hosts:
+      - "host.docker.internal:host-gateway"           # Docker Desktop has this name already; Linux needs this line
