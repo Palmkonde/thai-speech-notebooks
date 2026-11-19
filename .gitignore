@@ -6,3 +6,7 @@ segments.csv
 segments.txt
 overlap.py
 *.community-1.rttm
+app/__pycache__
+.env
+hyp_*.jsonl
+*.who-said-what.csv

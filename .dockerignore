@@ -1,0 +1,4 @@
+# Only the page and its server. Keeps .env (the token), .venv, .git and data/ out of the build.
+*
+!app/server.py
+!app/index.html

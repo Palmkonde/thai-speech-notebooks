@@ -18,6 +18,8 @@ dependencies = [
     "pyannote-metrics==4.1",
     "pyannote-audio==4.0.0",
     "torchcodec==0.9.1",
+    "pythainlp==5.4.0",   # ASR normalization and scoring (Part 2); no GPU needed
+    "jiwer==4.0.0",
 ]
 
 [tool.uv]

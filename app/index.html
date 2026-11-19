@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Who said what</title>
+<style>
+  :root {
+    --bg: #fafaf9; --panel: #ffffff; --text: #1c1917; --muted: #78716c; --line: #e7e5e4;
+    --accent: #2563eb; --accent-text: #ffffff; --warn: #b45309; --err: #b91c1c; --row-hover: #f5f5f4; --playing: #dbeafe;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1917; --panel: #262321; --text: #f5f5f4; --muted: #a8a29e; --line: #3a3532;
+      --accent: #60a5fa; --accent-text: #0c0a09; --warn: #fbbf24; --err: #f87171; --row-hover: #2f2b28; --playing: #1e3a5f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", "Noto Sans Thai", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  label.file { display: block; font-weight: 600; }
+  label.file small { display: block; font-weight: 400; color: var(--muted); }
+  label.file input { margin-top: 6px; width: 100%; }
+  .status { margin-top: 4px; font-size: 13px; color: var(--muted); }
+  .status.ok { color: inherit; }
+  .status.err { color: var(--err); }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+  button { font: inherit; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  input[type=number] { font: inherit; width: 70px; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); }
+  #message { font-size: 14px; }
+  #message.err { color: var(--err); }
+  .summary { display: flex; flex-wrap: wrap; gap: 24px; }
+  .summary div b { display: block; font-size: 20px; }
+  .summary div span { color: var(--muted); font-size: 13px; }
+  .names { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+  .names label { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+  .names input { font: inherit; width: 130px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: none; }
+  #timeline { width: 100%; display: block; margin-top: 12px; cursor: pointer; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
+  td.text { font-size: 16px; min-width: 260px; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--row-hover); }
+  tbody tr.playing { background: var(--playing); }
+  .spk { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .mixed { color: var(--warn); font-size: 12px; }
+  .hidden { display: none; }
+  audio { width: 100%; margin-top: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Who said what</h1>
+  <p class="sub">Upload the full recording, the ASR transcripts and the VAD segment times, then diarize. Click a row to play it.</p>
+
+  <section class="panel">
+    <div class="inputs">
+      <label class="file">Full audio
+        <small>The recording VAD was run on, 16-bit WAV (e.g. data/clean/clean.wav)</small>
+        <input type="file" id="audioFile" accept=".wav,audio/wav">
+        <div class="status" id="audioStatus">not loaded</div>
+      </label>
+      <label class="file">Transcripts
+        <small>results.jsonl from ASR_transcription.ipynb</small>
+        <input type="file" id="resultsFile" accept=".jsonl,.json,.txt">
+        <div class="status" id="resultsStatus">not loaded</div>
+      </label>
+      <label class="file">Segment times
+        <small>segments.csv from vad.ipynb (row i = segment_000i.wav)</small>
+        <input type="file" id="segmentsFile" accept=".csv">
+        <div class="status" id="segmentsStatus">not loaded</div>
+      </label>
+    </div>
+    <div class="actions">
+      <button class="primary" id="diarizeBtn" disabled>Diarize</button>
+      <label>Speakers <input type="number" id="numSpeakers" min="1" placeholder="auto"></label>
+      <span id="message"></span>
+    </div>
+    <audio id="player" controls class="hidden"></audio>
+  </section>
+
+  <section class="panel hidden" id="resultPanel">
+    <div class="summary" id="summary"></div>
+    <div class="names" id="names"></div>
+    <svg id="timeline" height="0"></svg>
+    <div class="actions">
+      <button id="csvBtn">Download CSV</button>
+      <button id="rttmBtn">Download RTTM</button>
+    </div>
+  </section>
+
+  <section class="panel hidden" id="tablePanel">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Start</th><th>End</th><th>Speaker</th><th>Text</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const COLORS = ["#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#db2777", "#0891b2", "#65a30d"];
+const MIXED_BELOW = 0.8;  // a segment whose main speaker has less than 80% of its speech is flagged: it may span a speaker change
+
+const state = { audio: null, audioUrl: null, results: null, segments: null, diar: null, names: {}, playEnd: null };
+const $ = id => document.getElementById(id);
+
+function setStatus(id, text, ok) {
+  const el = $(id);
+  el.textContent = text;
+  el.className = "status " + (ok ? "ok" : "err");
+}
+
+function fmt(t) {
+  const m = Math.floor(t / 60), s = t - 60 * m;
+  return `${m}:${s.toFixed(2).padStart(5, "0")}`;
+}
+
+// --- inputs ---------------------------------------------------------------------------------------------------------
+
+$("audioFile").addEventListener("change", e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  state.audio = f;
+  if (state.audioUrl) URL.revokeObjectURL(state.audioUrl);
+  state.audioUrl = URL.createObjectURL(f);
+  $("player").src = state.audioUrl;
+  $("player").classList.remove("hidden");
+  setStatus("audioStatus", `${f.name}, ${(f.size / 1e6).toFixed(1)} MB`, true);
+  state.diar = null;  // a new recording invalidates old turns
+  refresh();
+});
+
+$("resultsFile").addEventListener("change", async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const lines = (await f.text()).split(/\r?\n/).filter(l => l.trim());
+    const byName = {};
+    lines.forEach((l, i) => {
+      let r;
+      try { r = JSON.parse(l); } catch { throw new Error(`line ${i + 1} is not JSON`); }
+      if (!r.audio_path) throw new Error(`line ${i + 1} has no audio_path`);
+      byName[r.audio_path] = r;
+    });
+    state.results = byName;
+    setStatus("resultsStatus", `${f.name}, ${Object.keys(byName).length} transcripts`, true);
+  } catch (err) {
+    state.results = null;
+    setStatus("resultsStatus", `${f.name}: ${err.message}`, false);
+  }
+  refresh();
+});
+
+$("segmentsFile").addEventListener("change", async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const [head, ...rows] = (await f.text()).split(/\r?\n/).filter(l => l.trim()).map(l => l.split(","));
+    const si = head.indexOf("start_sec"), ei = head.indexOf("end_sec"), li = head.indexOf("label");
+    if (si < 0 || ei < 0) throw new Error("needs start_sec and end_sec columns");
+    // only speech rows, in file order: row i was saved as segment_{i:04d}.wav by vad.ipynb step 5
+    const segs = rows.filter(r => li < 0 || r[li].trim() === "speech")
+                     .map((r, i) => ({ i, name: `segment_${String(i).padStart(4, "0")}.wav`, start: +r[si], end: +r[ei] }));
+    if (segs.some(s => !(s.end > s.start))) throw new Error("a row has end <= start or a non-number");
+    state.segments = segs;
+    setStatus("segmentsStatus", `${f.name}, ${segs.length} segments`, true);
+  } catch (err) {
+    state.segments = null;
+    setStatus("segmentsStatus", `${f.name}: ${err.message}`, false);
+  }
+  refresh();
+});
+
+// --- diarize --------------------------------------------------------------------------------------------------------
+
+$("diarizeBtn").addEventListener("click", async () => {
+  const btn = $("diarizeBtn"), msg = $("message");
+  btn.disabled = true;
+  msg.className = "";
+  const t0 = Date.now();
+  const tick = setInterval(() => { msg.textContent = `Diarizing… ${Math.round((Date.now() - t0) / 1000)} s (the first run also downloads the model)`; }, 500);
+  try {
+    const n = $("numSpeakers").value.trim();
+    const res = await fetch("/diarize" + (n ? `?num_speakers=${encodeURIComponent(n)}` : ""), {
+      method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: state.audio,
+    });
+    const data = await res.json().catch(() => ({ error: `server answered ${res.status}` }));
+    if (!res.ok) throw new Error(data.error || `server answered ${res.status}`);
+    state.diar = data;
+    state.names = Object.fromEntries(data.speakers.map(s => [s, state.names[s] ?? s]));
+    msg.textContent = `Done: ${data.speakers.length} speakers in ${data.seconds} s.`;
+  } catch (err) {
+    msg.className = "err";
+    msg.textContent = err.message === "Failed to fetch" ? "Cannot reach the server: is app/server.py running?" : err.message;
+  } finally {
+    clearInterval(tick);
+    btn.disabled = false;
+    refresh();
+  }
+});
+
+// Give each VAD segment the speaker with the most time inside it, using the exclusive turns (one speaker at a time).
+function assignSpeakers(segments, turns) {
+  return segments.map(seg => {
+    const time = {};
+    for (const t of turns) {
+      const o = Math.min(seg.end, t.end) - Math.max(seg.start, t.start);
+      if (o > 0) time[t.speaker] = (time[t.speaker] || 0) + o;
+    }
+    const total = Object.values(time).reduce((a, b) => a + b, 0);
+    const ranked = Object.entries(time).sort((a, b) => b[1] - a[1]);
+    if (!ranked.length) return { speaker: null, share: 0, others: [] };
+    return { speaker: ranked[0][0], share: ranked[0][1] / total, others: ranked.slice(1).map(r => r[0]) };
+  });
+}
+
+// --- render ---------------------------------------------------------------------------------------------------------
+
+function color(speaker) {
+  const i = state.diar ? state.diar.speakers.indexOf(speaker) : -1;
+  return i < 0 ? "var(--muted)" : COLORS[i % COLORS.length];
+}
+
+function rowsData() {
+  const segs = state.segments || [];
+  const assigned = state.diar ? assignSpeakers(segs, state.diar.exclusive_turns) : segs.map(() => null);
+  return segs.map((s, k) => {
+    const r = state.results ? state.results[s.name] : null;
+    return { ...s, text: r ? (r.text ?? "") : null, best_model: r?.comparison?.best_model ?? null, a: assigned[k] };
+  });
+}
+
+function refresh() {
+  $("diarizeBtn").disabled = !state.audio;
+  const rows = rowsData();
+  const missing = state.results ? rows.filter(r => r.text === null).length : 0;
+  if (state.results && state.segments && missing) {
+    setStatus("segmentsStatus", `${state.segments.length} segments, ${missing} with no transcript (names do not match?)`, false);
+  }
+  renderTable(rows);
+  renderResult(rows);
+}
+
+function speakerCell(a) {
+  if (!a) return "";
+  if (!a.speaker) return `<span class="spk" style="color:var(--muted)">no speech found</span>`;
+  const name = escapeHtml(state.names[a.speaker] ?? a.speaker);
+  const mixed = a.share < MIXED_BELOW
+    ? `<div class="mixed">${Math.round(a.share * 100)}%, also ${a.others.map(o => escapeHtml(state.names[o] ?? o)).join(", ")}</div>` : "";
+  return `<span class="spk"><span class="swatch" style="background:${color(a.speaker)}"></span>${name}</span>${mixed}`;
+}
+
+function renderTable(rows) {
+  $("tablePanel").classList.toggle("hidden", !rows.length);
+  $("rows").innerHTML = rows.map(r => `
+    <tr data-i="${r.i}">
+      <td class="num">${r.i}</td>
+      <td class="num">${fmt(r.start)}</td>
+      <td class="num">${fmt(r.end)}</td>
+      <td>${speakerCell(r.a)}</td>
+      <td class="text">${r.text === null ? `<span style="color:var(--muted)">${state.results ? "no transcript" : ""}</span>` : escapeHtml(r.text)}</td>
+    </tr>`).join("");
+}
+
+function renderResult(rows) {
+  const d = state.diar;
+  $("resultPanel").classList.toggle("hidden", !d);
+  if (!d) return;
+  const assigned = rows.filter(r => r.a);
+  const mixed = assigned.filter(r => r.a.speaker && r.a.share < MIXED_BELOW).length;
+  const talk = {};
+  for (const t of d.exclusive_turns) talk[t.speaker] = (talk[t.speaker] || 0) + t.end - t.start;
+  $("summary").innerHTML = [
+    [d.speakers.length, "speakers"],
+    [d.turns.length, "turns"],
+    [fmt(d.duration), "recording"],
+    ...(rows.length ? [[`${mixed} / ${rows.length}`, `segments under ${MIXED_BELOW * 100}% one speaker`]] : []),
+  ].map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join("");
+
+  $("names").innerHTML = d.speakers.map(s => `
+    <label><span class="swatch" style="background:${color(s)}"></span>
+      <input data-spk="${escapeHtml(s)}" value="${escapeHtml(state.names[s])}" title="rename ${escapeHtml(s)}">
+      <span style="color:var(--muted)">${fmt(talk[s] || 0)}</span></label>`).join("");
+  renderTimeline(rows);
+}
+
+function renderTimeline(rows) {
+  const d = state.diar, svg = $("timeline");
+  const W = svg.clientWidth || 1000, LBL = 110, ROW = 22, n = d.speakers.length;
+  const H = (n + 1) * ROW + 18;
+  const x = t => LBL + (t / d.duration) * (W - LBL - 4);
+  let out = "";
+  d.speakers.forEach((s, k) => {
+    out += `<text x="0" y="${k * ROW + 15}" font-size="12" fill="currentColor">${escapeHtml(state.names[s])}</text>`;
+    for (const t of d.turns.filter(t => t.speaker === s))
+      out += `<rect x="${x(t.start)}" y="${k * ROW + 3}" width="${Math.max(1, x(t.end) - x(t.start))}" height="${ROW - 6}" rx="2" fill="${color(s)}"/>`;
+  });
+  const vy = n * ROW;
+  out += `<text x="0" y="${vy + 15}" font-size="12" fill="currentColor" opacity=".6">VAD segments</text>`;
+  for (const r of rows)
+    out += `<rect x="${x(r.start)}" y="${vy + 6}" width="${Math.max(1, x(r.end) - x(r.start))}" height="${ROW - 12}" fill="currentColor" opacity=".35"/>`;
+  for (let t = 0; t <= d.duration; t += tickStep(d.duration))
+    out += `<text x="${x(t)}" y="${H - 2}" font-size="10" fill="currentColor" opacity=".6" text-anchor="middle">${fmt(t).replace(/\.\d+$/, "")}</text>`;
+  out += `<line id="cursor" x1="${LBL}" x2="${LBL}" y1="0" y2="${H - 14}" stroke="var(--accent)" stroke-width="1.5" visibility="hidden"/>`;
+  svg.setAttribute("height", H);
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = out;
+  svg.dataset.lbl = LBL; svg.dataset.w = W;
+}
+
+function tickStep(dur) {
+  for (const s of [5, 10, 15, 30, 60, 120, 300, 600, 900, 1800]) if (dur / s <= 10) return s;
+  return 3600;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// --- speaker names --------------------------------------------------------------------------------------------------
+
+$("names").addEventListener("input", e => {
+  const s = e.target.dataset.spk;
+  if (s === undefined) return;
+  state.names[s] = e.target.value || s;
+  const rows = rowsData();
+  renderTable(rows);
+  renderTimeline(rows);
+});
+
+// --- playback -------------------------------------------------------------------------------------------------------
+
+function play(start, end) {
+  const p = $("player");
+  if (!state.audioUrl) { $("message").textContent = "Load the full audio to play segments."; return; }
+  state.playEnd = end;
+  p.currentTime = start;
+  p.play();
+}
+
+$("rows").addEventListener("click", e => {
+  const tr = e.target.closest("tr");
+  if (!tr) return;
+  const s = state.segments[+tr.dataset.i];
+  document.querySelectorAll("tr.playing").forEach(r => r.classList.remove("playing"));
+  tr.classList.add("playing");
+  play(s.start, s.end);
+});
+
+$("timeline").addEventListener("click", e => {
+  const svg = $("timeline"), rect = svg.getBoundingClientRect();
+  const lbl = +svg.dataset.lbl, w = +svg.dataset.w;
+  const t = ((e.clientX - rect.left) * (w / rect.width) - lbl) / (w - lbl - 4) * state.diar.duration;
+  if (t >= 0) play(t, null);
+});
+
+$("player").addEventListener("timeupdate", () => {
+  const p = $("player");
+  if (state.playEnd !== null && p.currentTime >= state.playEnd) { p.pause(); state.playEnd = null; }
+  const c = document.getElementById("cursor");
+  if (c && state.diar) {
+    const svg = $("timeline"), lbl = +svg.dataset.lbl, w = +svg.dataset.w;
+    const cx = lbl + (p.currentTime / state.diar.duration) * (w - lbl - 4);
+    c.setAttribute("x1", cx); c.setAttribute("x2", cx); c.setAttribute("visibility", "visible");
+  }
+});
+
+window.addEventListener("resize", () => { if (state.diar) renderTimeline(rowsData()); });
+
+// --- downloads ------------------------------------------------------------------------------------------------------
+
+function download(name, text, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function stem() { return state.audio ? state.audio.name.replace(/\.[^.]+$/, "") : "audio"; }
+
+$("csvBtn").addEventListener("click", () => {
+  const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = [["segment", "start_sec", "end_sec", "speaker", "speaker_share", "text"].join(",")];
+  for (const r of rowsData())
+    lines.push([r.name, r.start.toFixed(3), r.end.toFixed(3), q(r.a?.speaker ? state.names[r.a.speaker] : ""),
+                r.a?.speaker ? r.a.share.toFixed(3) : "", q(r.text)].join(","));
+  download(`${stem()}.speakers.csv`, "﻿" + lines.join("\n") + "\n", "text/csv;charset=utf-8");  // BOM: Excel reads Thai
+});
+
+$("rttmBtn").addEventListener("click", () => {
+  const lines = state.diar.turns.map(t =>
+    `SPEAKER ${stem()} 1 ${t.start.toFixed(3)} ${(t.end - t.start).toFixed(3)} <NA> <NA> ${state.names[t.speaker].replace(/\s+/g, "_")} <NA> <NA>`);
+  download(`${stem()}.community-1.rttm`, lines.join("\n") + "\n", "text/plain");
+});
+</script>
+</body>
+</html>
